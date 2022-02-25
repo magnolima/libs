@@ -3,15 +3,35 @@ unit MLLib;
 interface
 
 uses 
-  System.Math;
+  System.SysUtils, System.StrUtils, System.Math, IdHashMessageDigest
+{$IF Defined(ANDROID)}
+  , Androidapi.Helpers, Androidapi.JNI.GraphicsContentViewText,
+  DW.MultiReceiver.Android, Androidapi.JNI.Support
+{$ENDIF};
 
 interface
 
-function DistanciaGrauToMetro(Const x1, y1, x2, y2: single; LongaDistancia: boolean = False): single;
-function DecodeString(Const Text: string; StartKey, MultKey, AddKey: integer): string;
-function EncodeString(Const Text: string; StartKey, MultKey, AddKey: integer): string;
+function MD5OfString(Const Text: string): String;
+function DistanciaGrauToMetro(Const x1, y1, x2, y2: single; LongaDistancia: boolean = False): Single;
+function DecodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
+function EncodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
+{$IF Defined(ANDROID)}
+function GetProgramVersion: String;
+{$ENDIF};
+{$IF Defined(MSWINDOWS)}
+function GetProgramVersion(const FileName: TFileName): String;
+{$ENDIF};
 
 implentation
+
+function MD5OfString(Const Text: string): String;
+begin
+  with TIdHashMessageDigest5.Create do
+  begin
+    Result := HashStringAsHex(Text);
+    Free;
+  end;
+end;
 
 function DistanciaGrauToMetro(Const x1, y1, x2, y2: single; LongaDistancia: boolean = False): single;
 var
@@ -54,5 +74,47 @@ begin
     StartKey := (Ord(Text[i]) + StartKey) * MultKey + AddKey;
   end;
 end;
+
+{$IF Defined(MSWINDOWS)}
+// Obtem versao de um executável no Windows
+// Exemplo: versao := GetProgramVersion( ParamStr(0) )
+function GetProgramVersion(const FileName: TFileName): String;
+var
+  VerInfoSize: Cardinal;
+  VerValueSize: Cardinal;
+  Dummy: Cardinal;
+  PVerInfo: Pointer;
+  PVerValue: PVSFixedFileInfo;
+begin
+  Result := '';
+  VerInfoSize := GetFileVersionInfoSize(PChar(FileName), Dummy);
+  GetMem(PVerInfo, VerInfoSize);
+  try
+    if GetFileVersionInfo(PChar(FileName), 0, VerInfoSize, PVerInfo) then
+      if VerQueryValue(PVerInfo, '\', Pointer(PVerValue), VerValueSize) then
+        with PVerValue^ do
+          Result := Format('%d.%d.%d.%d', [HiWord(dwFileVersionMS), // Major
+            LoWord(dwFileVersionMS), // Minor
+            HiWord(dwFileVersionLS), // Release
+            LoWord(dwFileVersionLS)]); // Build
+  finally
+    FreeMem(PVerInfo, VerInfoSize);
+  end;
+end;
+{$ENDIF}
+
+{$IF Defined(ANDROID)}
+// Obtem versao de um pacote Android
+// Exemplo: versao := GetProgramVersion();
+function GetProgramVersion: String;
+var
+  PackageManager: JPackageManager;
+  PackageInfo: JPackageInfo;
+begin
+  PackageManager := TAndroidHelper.Context.getPackageManager;
+  PackageInfo := PackageManager.getPackageInfo(TAndroidHelper.Context.getPackageName, 0);
+  Result := JStringToString(PackageInfo.versionName);
+end;
+{$ENDIF}
 
 end.
