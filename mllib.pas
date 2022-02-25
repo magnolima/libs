@@ -19,6 +19,7 @@ function EncodeString(Const Text: string; StartKey, MultKey, AddKey: integer): S
 function GetProgramVersion: String;
 {$ENDIF};
 {$IF Defined(MSWINDOWS)}
+function HexToIntegerFast(const HexString: string): Integer;
 function GetProgramVersion(const FileName: TFileName): String;
 {$ENDIF};
 
@@ -75,7 +76,73 @@ begin
   end;
 end;
 
+/// *********** WINDOWS EXCLUSIVAMENTE ********* \\\\
 {$IF Defined(MSWINDOWS)}
+
+// Converção de hexadecimal para inteiro utilizando
+// chamadas MMX para alta performance
+function HexToIntegerFast(const HexString: string): Integer;
+const
+  ASCIINines: Int64 = $3939393939393939;
+  Nines: Int64 = $0909090909090909;
+  LowNibbles: Int64 = $0F0F0F0F0F0F0F0F;
+  AlternateBytes: Int64 = $00FF00FF00FF00FF;
+  asm
+    { On entry:
+    eax = pointer to HexString }
+    { Blank string? }
+    or eax,eax
+    jz @Done
+    { Get the string length }
+    mov ecx, [eax - 4]
+    { Set up mmx registers }
+    movq mm2, ASCIINines
+    movq mm3, Nines
+    movq mm4, LowNibbles
+    movq mm5, AlternateBytes
+    { Get up to 8 characters into mm0. We can safely read a qword here since
+    the
+    first character of a string is preceded by two dwords (the length and the
+    reference count). Since the maximum length of a string for this function
+    is
+    8 characters, there will also be 3 #0 characters preceding the first
+    character of the string. }
+    movq mm0, [eax + ecx - 8]
+    { Add 9 to all characters>57 ('9') }
+    movq mm1, mm0
+    pcmpgtb mm1, mm2
+    pand mm1, mm3
+    paddb mm0, mm1
+    { Extract only the low nibbles }
+    pand mm0, mm4
+    { Shift the nibbles into position }
+    movq mm1, mm0
+    psllq mm1, 4
+    psrlq mm0, 8
+    { Bitwise Or so that we have the nibbles in the order ...4534231201 }
+    por mm0, mm1
+    { Keep only every second byte ...45xx23xx01 }
+    pand mm0, mm5
+    { Now we need to extract every second byte into a dword ...452301 }
+    packuswb mm0, mm0
+    { Get the result in eax }
+    movd eax, mm0
+    { Exit mmx machine state }
+    emms
+    { Valid number of characters? ->If more than 8 we zero the result }
+    sub ecx, 9
+    sbb edx, edx
+    and eax, edx
+    { Are there at least 5 characters, i.e. should we keep the high word? }
+    add ecx, 4
+    sbb edx, edx
+    and ax, dx
+    { Swap bytes into their correct positions }
+    bswap eax
+  @Done:
+
+end;
+
 // Obtem versao de um executável no Windows
 // Exemplo: versao := GetProgramVersion( ParamStr(0) )
 function GetProgramVersion(const FileName: TFileName): String;
@@ -103,6 +170,7 @@ begin
 end;
 {$ENDIF}
 
+/// *********** ANDROID EXCLUSIVAMENTE ********* \\\\
 {$IF Defined(ANDROID)}
 // Obtem versao de um pacote Android
 // Exemplo: versao := GetProgramVersion();
