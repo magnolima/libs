@@ -15,9 +15,7 @@ function MD5OfString(Const Text: string): String;
 function DistanciaGrauToMetro(Const x1, y1, x2, y2: single; LongaDistancia: boolean = False): Single;
 function DecodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
 function EncodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
-{$IF Defined(ANDROID)}
 function GetProgramVersion: String;
-{$ENDIF};
 {$IF Defined(MSWINDOWS)}
 function HexToIntegerFast(const HexString: string): Integer;
 function GetProgramVersion(const FileName: TFileName): String;
@@ -170,11 +168,57 @@ begin
 end;
 {$ENDIF}
 
-/// *********** ANDROID EXCLUSIVAMENTE ********* \\\\
+function GetProgramVersion: String;
+begin
+  Result := '1.0.0.0'; // iOS not implemented
+{$IF Defined(MSWINDOWS)}
+  Result := GetWindowsProgramVersion();
+{$ENDIF}
 {$IF Defined(ANDROID)}
+  Result := GetAndroidProgramVersion();
+{$ENDIF}
+end;
+
+{$IF Defined(MSWINDOWS)}
+procedure GetWindowsProgramVersion: String;
+{ by Steve Schafer }
+var
+   major, minor, release, build: Word
+   VerInfoSize: DWORD;
+   VerInfo: Pointer;
+   VerValueSize: DWORD;
+   VerValue: PVSFixedFileInfo;
+   Dummy: DWORD;
+begin
+   VerInfoSize := GetFileVersionInfoSize(PChar(ParamStr(0)), Dummy);
+   GetMem(VerInfo, VerInfoSize);
+   GetFileVersionInfo(PChar(ParamStr(0)), 0, VerInfoSize, VerInfo);
+   major := 1;
+   minor := 0;
+   release := 0;
+   build := 0;
+
+   if VerInfo <> nil then
+   begin
+      VerQueryValue(VerInfo, '\', Pointer(VerValue), VerValueSize);
+      with VerValue^ do
+      begin
+         major := dwFileVersionMS shr 16;
+         minor := dwFileVersionMS and $FFFF;
+         release := dwFileVersionLS shr 16;
+         build := dwFileVersionLS and $FFFF;
+      end;
+   end;
+   Result := Format('%d.%d.%d.%d', [major, minor, release, build]);
+   FreeMem(VerInfo, VerInfoSize);
+end;
+{$ENDIF}
+
+/// *********** ANDROID EXCLUSIVAMENTE ********* \\\\
 // Obtem versao de um pacote Android
 // Exemplo: versao := GetProgramVersion();
-function GetProgramVersion: String;
+{$IF Defined(ANDROID)}
+function GetAndroidProgramVersion: String;
 var
   PackageManager: JPackageManager;
   PackageInfo: JPackageInfo;
