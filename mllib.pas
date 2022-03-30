@@ -9,6 +9,12 @@ uses
   DW.MultiReceiver.Android, Androidapi.JNI.Support
 {$ENDIF};
 
+type TEnumConverter = class
+  public
+    class function EnumToInt<T>(const EnumValue: T): Integer;
+    class function EnumToString<T>(EnumValue: T): string;
+  end;
+
 interface
 
 function MD5OfString(Const Text: string): String;
@@ -19,6 +25,8 @@ function GetProgramVersion: String;
 {$IF Defined(MSWINDOWS)}
 function HexToIntegerFast(const HexString: string): Integer;
 function GetProgramVersion(const FileName: TFileName): String;
+function GetCLIOutput(CommandLine: string; Work: string = 'C:\'): string;
+procedure GetCLIOutputOnce(CommandLine: string; AOutput: TStringList);
 {$ENDIF};
 
 implentation
@@ -226,6 +234,151 @@ begin
   PackageManager := TAndroidHelper.Context.getPackageManager;
   PackageInfo := PackageManager.getPackageInfo(TAndroidHelper.Context.getPackageName, 0);
   Result := JStringToString(PackageInfo.versionName);
+end;
+{$ENDIF}
+
+// Obtem nome do enumerador ou seu indice
+class function TEnumConverter.EnumToInt<T>(const EnumValue: T): Integer;
+begin
+   Result := 0;
+   Move(EnumValue, Result, sizeOf(EnumValue));
+end;
+
+class function TEnumConverter.EnumToString<T>(EnumValue: T): string;
+begin
+   Result := GetEnumName(TypeInfo(T), EnumToInt(EnumValue));
+end;
+
+{$IF Defined(MSWINDOWS)}
+// Source https://stackoverflow.com/questions/9119999/getting-output-from-a-shell-dos-app-into-a-delphi-app
+function GetCLIOutput(CommandLine: string; Work: string = 'C:\'): string;
+var
+  SA: TSecurityAttributes;
+  SI: TStartupInfo;
+  PI: TProcessInformation;
+  StdOutPipeRead, StdOutPipeWrite: THandle;
+  WasOK: Boolean;
+  Buffer: array[0..255] of AnsiChar;
+  BytesRead: Cardinal;
+  WorkDir: string;
+  Handle: Boolean;
+begin
+  Result := '';
+  with SA do begin
+    nLength := SizeOf(SA);
+    bInheritHandle := True;
+    lpSecurityDescriptor := nil;
+  end;
+  CreatePipe(StdOutPipeRead, StdOutPipeWrite, @SA, 0);
+  try
+    with SI do
+    begin
+      FillChar(SI, SizeOf(SI), 0);
+      cb := SizeOf(SI);
+      dwFlags := STARTF_USESHOWWINDOW or STARTF_USESTDHANDLES;
+      wShowWindow := SW_HIDE;
+      hStdInput := GetStdHandle(STD_INPUT_HANDLE); // don't redirect stdin
+      hStdOutput := StdOutPipeWrite;
+      hStdError := StdOutPipeWrite;
+    end;
+    WorkDir := Work;
+    Handle := CreateProcess(nil, PChar('cmd.exe /C ' + CommandLine),
+                            nil, nil, True, 0, nil,
+                            PChar(WorkDir), SI, PI);
+    CloseHandle(StdOutPipeWrite);
+    if Handle then
+      try
+        repeat
+          WasOK := ReadFile(StdOutPipeRead, Buffer, 255, BytesRead, nil);
+          if BytesRead > 0 then
+          begin
+            Buffer[BytesRead] := #0;
+            Result := Result + Buffer;
+          end;
+        until not WasOK or (BytesRead = 0);
+        WaitForSingleObject(PI.hProcess, INFINITE);
+      finally
+        CloseHandle(PI.hThread);
+        CloseHandle(PI.hProcess);
+      end;
+  finally
+    CloseHandle(StdOutPipeRead);
+  end;
+end;
+// Lê informações de uma vez para AOutput
+procedure GetCLIOutputOnce(CommandLine: string; AOutput: TStringList);
+const
+  READ_BUFFER_SIZE = 8000; // aumentado para 8K+-
+var
+  Security: TSecurityAttributes;
+  readableEndOfPipe, writeableEndOfPipe: THandle;
+  start: TStartUpInfo;
+  ProcessInfo: TProcessInformation;
+  Buffer: PAnsiChar;
+  BytesRead: DWORD;
+  AppRunning: DWORD;
+begin
+  Security.nLength := SizeOf(TSecurityAttributes);
+  Security.bInheritHandle := true;
+  Security.lpSecurityDescriptor := nil;
+
+  if CreatePipe( { var } readableEndOfPipe, { var } writeableEndOfPipe, @Security, 0) then
+  begin
+    Buffer := AllocMem(READ_BUFFER_SIZE + 1);
+    FillChar(start, SizeOf(start), #0);
+    start.cb := SizeOf(start);
+
+    // Set up members of the STARTUPINFO structure.
+    // This structure specifies the STDIN and STDOUT handles for redirection.
+    // - Redirect the output and error to the writeable end of our pipe.
+    // - We must still supply a valid StdInput handle (because we used STARTF_USESTDHANDLES to swear that all three handles will be valid)
+    start.dwFlags := start.dwFlags or STARTF_USESTDHANDLES;
+    start.hStdInput := GetStdHandle(STD_INPUT_HANDLE);
+    // we're not redirecting stdInput; but we still have to give it a valid handle
+    start.hStdOutput := writeableEndOfPipe;
+    // we give the writeable end of the pipe to the child process; we read from the readable end
+    start.hStdError := writeableEndOfPipe;
+
+    // We can also choose to say that the wShowWindow member contains a value.
+    // In our case we want to force the console window to be hidden.
+    start.dwFlags := start.dwFlags + STARTF_USESHOWWINDOW;
+    start.wShowWindow := SW_HIDE;
+
+    // Don't forget to set up members of the PROCESS_INFORMATION structure.
+    ProcessInfo := Default (TProcessInformation);
+
+    // WARNING: The unicode version of CreateProcess (CreateProcessW) can modify the command-line "DosApp" string.
+    // Therefore "DosApp" cannot be a pointer to read-only memory, or an ACCESS_VIOLATION will occur.
+    // We can ensure it's not read-only with the RTL function: UniqueString
+    UniqueString( { var } CommandLine);
+
+    if CreateProcess(nil, PChar(CommandLine), nil, nil, true, NORMAL_PRIORITY_CLASS, nil, nil, start, { var } ProcessInfo)
+    then
+    begin
+      // Wait for the application to terminate, as it writes it's output to the pipe.
+      // WARNING: If the console app outputs more than 2400 bytes (ReadBuffer),
+      // it will block on writing to the pipe and *never* close.
+      repeat
+        AppRunning := WaitForSingleObject(ProcessInfo.hProcess, 100);
+        // Application.ProcessMessages;
+      until (AppRunning <> WAIT_TIMEOUT);
+
+      // Read the contents of the pipe out of the readable end
+      // WARNING: if the console app never writes anything to the StdOutput, then ReadFile will block and never return
+      repeat
+        BytesRead := 0;
+        ReadFile(readableEndOfPipe, Buffer[0], READ_BUFFER_SIZE, { var } BytesRead, nil);
+        Buffer[BytesRead] := #0;
+        OemToAnsi(Buffer, Buffer);
+        AOutput.Text := AOutput.Text + String(Buffer);
+      until (BytesRead < READ_BUFFER_SIZE);
+    end;
+    FreeMem(Buffer);
+    CloseHandle(ProcessInfo.hProcess);
+    CloseHandle(ProcessInfo.hThread);
+    CloseHandle(readableEndOfPipe);
+    CloseHandle(writeableEndOfPipe);
+  end;
 end;
 {$ENDIF}
 
