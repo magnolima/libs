@@ -3,7 +3,7 @@ unit MLLib;
 interface
 
 uses 
-  System.SysUtils, System.StrUtils, System.Math, IdHashMessageDigest
+  System.SysUtils, System.StrUtils, System.Math, IdHashMessageDigest, System.RegularExpressions
 {$IF Defined(ANDROID)}
   , Androidapi.Helpers, Androidapi.JNI.GraphicsContentViewText,
   DW.MultiReceiver.Android, Androidapi.JNI.Support
@@ -31,6 +31,25 @@ procedure GetCLIOutputOnce(CommandLine: string; AOutput: TStringList);
 
 implentation
 
+(* Extract the URLs found in a text - it's a bit tricky *)
+function ExtractURLFromText(const Text: String): TArray<String>;
+var
+  FoundCollection: TMatchCollection;
+  Found: TMatch;
+  MyRegex: string;
+begin
+  SetLength(Result,0);
+  //myregex := 'https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)';
+  MyRegex := '(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+';
+  FoundCollection := TRegEx.Matches(Text, MyRegex,[roIgnoreCase]);
+  for Found in FoundCollection do
+  begin
+    SetLength(Result,Length(Result)+1);
+    Result[Length(Result)-1] := Found.Value;
+  end;
+end;
+
+(* Simply generantes the MD5 of a given string *)
 function MD5OfString(Const Text: string): String;
 begin
   with TIdHashMessageDigest5.Create do
@@ -40,6 +59,7 @@ begin
   end;
 end;
 
+(* Calculates the distance in meters from degree coordinates *)
 function DistanciaGrauToMetro(Const x1, y1, x2, y2: single; LongaDistancia: boolean = False): single;
 var
   fGrauRadiano, fLatitudeRadiano, fDistancia: double;
@@ -58,6 +78,7 @@ begin
   Result := round(fDistancia);
 end;
 
+(* Encode a string *)
 function EncodeString(Const Text: string; StartKey, MultKey, AddKey: integer): string;
 var
   i: Word;
@@ -70,6 +91,7 @@ begin
   end;
 end;
 
+(* Decode that string *)
 function DecodeString(Const Text: string; StartKey, MultKey, AddKey: integer): string;
 var
   i: Word;
@@ -87,6 +109,7 @@ end;
 
 // Converção de hexadecimal para inteiro utilizando
 // chamadas MMX para alta performance
+(* Windows only fast conversion from hexa number to integer *)
 function HexToIntegerFast(const HexString: string): Integer;
 const
   ASCIINines: Int64 = $3939393939393939;
@@ -149,33 +172,7 @@ const
 
 end;
 
-// Obtem versao de um executável no Windows
-// Exemplo: versao := GetProgramVersion( ParamStr(0) )
-function GetProgramVersion(const FileName: TFileName): String;
-var
-  VerInfoSize: Cardinal;
-  VerValueSize: Cardinal;
-  Dummy: Cardinal;
-  PVerInfo: Pointer;
-  PVerValue: PVSFixedFileInfo;
-begin
-  Result := '';
-  VerInfoSize := GetFileVersionInfoSize(PChar(FileName), Dummy);
-  GetMem(PVerInfo, VerInfoSize);
-  try
-    if GetFileVersionInfo(PChar(FileName), 0, VerInfoSize, PVerInfo) then
-      if VerQueryValue(PVerInfo, '\', Pointer(PVerValue), VerValueSize) then
-        with PVerValue^ do
-          Result := Format('%d.%d.%d.%d', [HiWord(dwFileVersionMS), // Major
-            LoWord(dwFileVersionMS), // Minor
-            HiWord(dwFileVersionLS), // Release
-            LoWord(dwFileVersionLS)]); // Build
-  finally
-    FreeMem(PVerInfo, VerInfoSize);
-  end;
-end;
-{$ENDIF}
-
+(* Get the software version - Windows or Android *)
 function GetProgramVersion: String;
 begin
   Result := '1.0.0.0'; // iOS not implemented
@@ -188,6 +185,8 @@ begin
 end;
 
 {$IF Defined(MSWINDOWS)}
+// Obtem versao de um executável no Windows
+// Exemplo: versao := GetProgramVersion( ParamStr(0) 
 procedure GetWindowsProgramVersion: String;
 { by Steve Schafer }
 var
@@ -251,6 +250,7 @@ end;
 
 {$IF Defined(MSWINDOWS)}
 // Source https://stackoverflow.com/questions/9119999/getting-output-from-a-shell-dos-app-into-a-delphi-app
+(* Allows execute a command line program and catch the output lines *)
 function GetCLIOutput(CommandLine: string; Work: string = 'C:\'): string;
 var
   SA: TSecurityAttributes;
@@ -305,7 +305,9 @@ begin
     CloseHandle(StdOutPipeRead);
   end;
 end;
+
 // Lê informações de uma vez para AOutput
+(* Allows execute a command line program and catch the output lines - v2 *)
 procedure GetCLIOutputOnce(CommandLine: string; AOutput: TStringList);
 const
   READ_BUFFER_SIZE = 8000; // aumentado para 8K+-
