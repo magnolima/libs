@@ -22,6 +22,7 @@ function DistanciaGrauToMetro(Const x1, y1, x2, y2: single; LongaDistancia: bool
 function DecodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
 function EncodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
 function GetProgramVersion: String;
+function ColorToFMXColor(const Color: TColor; const FMX: boolean = false): TColor;
 {$IF Defined(MSWINDOWS)}
 function HexToIntegerFast(const HexString: string): Integer;
 function GetProgramVersion(const FileName: TFileName): String;
@@ -31,6 +32,22 @@ function ExtractURLFromText(const Text: String): TArray<String>;
 {$ENDIF};
 
 implentation
+
+(* Set color... *)
+function ColorToFMXColor(const Color: TColor; const FMX: boolean = false): TColor;
+const
+	COLOR_ALPHA = 4278190080;
+var
+	HexColor: String;
+begin
+	if FMX then
+	begin
+		HexColor := IntToHex(Color);
+		Result := StrToInt('$FF' + Copy(HexColor, 7, 2) + Copy(HexColor, 5, 2) + Copy(HexColor, 3, 2));
+	end
+	else
+		Result := COLOR_ALPHA + Color
+end;
 
 (* Extract the URLs found in a text - it's a bit tricky *)
 function ExtractURLFromText(const Text: String): TArray<String>;
