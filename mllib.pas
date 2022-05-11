@@ -25,7 +25,6 @@ function GetProgramVersion: String;
 function ColorToFMXColor(const Color: TColor; const FMX: boolean = false): TColor;
 {$IF Defined(MSWINDOWS)}
 function HexToIntegerFast(const HexString: string): Integer;
-function GetProgramVersion(const FileName: TFileName): String;
 function GetCLIOutput(CommandLine: string; Work: string = 'C:\'): string;
 procedure GetCLIOutputOnce(CommandLine: string; AOutput: TStringList);
 function ExtractURLFromText(const Text: String): TArray<String>;
