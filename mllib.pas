@@ -23,6 +23,7 @@ function DecodeString(Const Text: string; StartKey, MultKey, AddKey: integer): S
 function EncodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
 function GetProgramVersion: String;
 function ColorToFMXColor(const Color: TColor; const FMX: boolean = false): TColor;
+function RoundUp(const Value: Double; const Decimals: Integer): Double;
 {$IF Defined(MSWINDOWS)}
 function HexToIntegerFast(const HexString: string): Integer;
 function GetCLIOutput(CommandLine: string; Work: string = 'C:\'): string;
@@ -31,6 +32,11 @@ function ExtractURLFromText(const Text: String): TArray<String>;
 {$ENDIF};
 
 implentation
+
+function RoundUp(const Value: Double; const Decimals: Integer): Double;
+begin
+   Result := Value + (5/Power(10,Abs(Decimals)));
+end;
 
 (* Set color... *)
 function ColorToFMXColor(const Color: TColor; const FMX: boolean = false): TColor;
