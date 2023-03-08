@@ -29,9 +29,19 @@ function HexToIntegerFast(const HexString: string): Integer;
 function GetCLIOutput(CommandLine: string; Work: string = 'C:\'): string;
 procedure GetCLIOutputOnce(CommandLine: string; AOutput: TStringList);
 function ExtractURLFromText(const Text: String): TArray<String>;
+function LogD(const Msg: String): Integer;
 {$ENDIF};
 
 implentation
+// wapper to Log.d for using with Android. It will correctly correspond to the debug representation type
+function LogD(const Msg: String): Integer;
+var
+   M: TMarshaller;
+begin
+{$IFDEF ANDROID}
+   Result := __android_log_write(android_LogPriority.ANDROID_LOG_DEBUG, 'debug', M.AsUtf8(Msg).ToPointer);
+{$ENDIF}
+end;
 
 function RoundUp(const Value: Double; const Decimals: Integer): Double;
 begin
