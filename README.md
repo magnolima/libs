@@ -75,3 +75,13 @@ A Simple REST lib to use with the Programmable Google Search (https://developers
     Memo1.Text := Text;
   end;
   ```
+  
+ # ElevenLabs.API
+  
+So far no demo available, but it's pretty easy to use. Just go to http://www.elevenlabs.io/ create get your API key (or sign in to get one). Using the Create(<API_KEY>) create the object to use. You can read all available voices by fetching AvailableVoices method, select the voice id (based on that list - there is a dictionary property called Voices that have the voice name and its id) and invoke the method Talk("This is my voice!"). The result will be a file called output.mp3 (you can change it). 
+  
+To do:
+  - present a simple demo
+  - use the stream feature.
+  
+  
