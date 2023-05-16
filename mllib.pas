@@ -18,7 +18,7 @@ type TEnumConverter = class
 interface
 
 function MD5OfString(Const Text: string): String;
-function DistanciaGrauToMetro(Const x1, y1, x2, y2: single; LongaDistancia: boolean = False): Single;
+function DistanceInMetersFromCoordinates(Const x1, y1, x2, y2: single; isLongDistance: boolean = False): Single;
 function DecodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
 function EncodeString(Const Text: string; StartKey, MultKey, AddKey: integer): String;
 function GetProgramVersion: String;
@@ -93,7 +93,7 @@ begin
 end;
 
 (* Calculates the distance in meters from degree coordinates *)
-function DistanciaGrauToMetro(Const x1, y1, x2, y2: single; LongaDistancia: boolean = False): single;
+function DistanceInMetersFromCoordinates(Const x1, y1, x2, y2: single; isLongDistance: boolean = False): Single;
 var
   fGrauRadiano, fLatitudeRadiano, fDistancia: double;
 begin
