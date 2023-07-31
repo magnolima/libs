@@ -6,7 +6,7 @@ uses
   System.SysUtils, System.StrUtils, System.Math, IdHashMessageDigest, System.RegularExpressions
 {$IF Defined(ANDROID)}
   , Androidapi.Helpers, Androidapi.JNI.GraphicsContentViewText,
-  DW.MultiReceiver.Android, Androidapi.JNI.Support
+  DW.MultiReceiver.Android, Androidapi.JNI.Support, Androidapi.log
 {$ENDIF};
 
 type TEnumConverter = class
