@@ -45,6 +45,7 @@ function LogD(const Msg: String): Integer;
 {$ENDIF}
 function GeoCoordinatesToDMS(ALatitude, ALongitude: Double;
   const AFormat: String = '%0.3d° %0.2d'' %0.2d" %s'): string;
+// WARNING! This function WON'T revert from the default format used by GeoCoordinatesToDMS() !!!  
 function DMSToGeoCoordinates(const ACoordStr: string): TGeoCoordenadas;
 function DistanceInMetersFromCoordinates(Const x1, y1, x2, y2: single;
   isLongDistance: boolean = False): single;
@@ -499,6 +500,7 @@ begin
 		Result.Longitude := -Result.Longitude;
 end;
 
+// WARNING! This function WON'T revert from the default format used by GeoCoordinatesToDMS() !!!  
 function GeoCoordinatesToDMS(ALatitude, ALongitude: Double;
   const AFormat: String = '%0.3d° %0.2d'' %0.2d" %s'): string;
 var
